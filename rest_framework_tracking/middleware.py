@@ -41,9 +41,11 @@ class DrfTrackingMiddleware(MiddlewareMixin):
 
     def process_response(self, request, response):
         # Don;t log in case of superuser
-        if request.user.is_superuser:
-            return response
-
+        try:
+            if request.user.is_superuser:
+                return response
+        except: # catech exception in case of redirect
+            pass
         rq = self._convert_django_request_to_drf_request_object(request)
         self.drf_logging.finalize_response(rq, response, middleware=True)
         return response

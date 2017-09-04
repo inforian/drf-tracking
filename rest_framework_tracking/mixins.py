@@ -92,8 +92,8 @@ class BaseLoggingMixin(object):
 
         # save to log
         if (self._should_log(request, response)):
-            self.log.response = response.rendered_content
-            self.log.status_code = response.status_code
+            self.log.response = response.get('rendered_content')
+            self.log.status_code = response.get('status_code')
             self.log.response_ms = response_ms
             try:
                 self.log.save()
