@@ -38,6 +38,12 @@ Install using `pip`...
 $ pip install drf-tracking
 ```
 
+
+## for middleware support
+- install this fork using pip install -e git+git://github.com/inforian/drf-tracking.git@master#egg=drf-tracking
+- Add `'rest_framework_tracking.middleware.DrfTrackingMiddleware'` in settings.
+- Follow other instructions as mentioned below.
+
 Register with your Django project by adding `rest_framework_tracking`
 to the `INSTALLED_APPS` list in your project's `settings.py` file.
 Then run the migrations for the `APIRequestLog` model:
