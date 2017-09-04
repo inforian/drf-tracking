@@ -1,5 +1,8 @@
 
-from django.utils.deprecation import MiddlewareMixin
+try:
+    from django.utils.deprecation import MiddlewareMixin
+except ImportError:  # MiddlewareMixin is depreciated so catch this exception
+    MiddlewareMixin = object
 from .mixins import LoggingMixin
 
 
