@@ -2,6 +2,9 @@ from .models import APIRequestLog
 from django.utils.timezone import now
 import traceback
 
+from rest_framework.request import Request
+from rest_framework.settings import api_settings
+
 
 class BaseLoggingMixin(object):
     logging_methods = '__all__'
@@ -10,7 +13,6 @@ class BaseLoggingMixin(object):
     """Mixin to log requests"""
     def initial(self, request, *args, **kwargs):
         # get IP
-
         ipaddr = request.META.get("HTTP_X_FORWARDED_FOR", None)
         if ipaddr:
             # X_FORWARDED_FOR returns client1, proxy1, proxy2,...
@@ -35,7 +37,7 @@ class BaseLoggingMixin(object):
             view_method = method.lower()
 
         # create log
-        qm = self._clean_data(request.query_params.dict())
+        qm = self._clean_data(request.GET.dict())
 
         self.log = APIRequestLog(
             requested_at=now(),
@@ -58,15 +60,23 @@ class BaseLoggingMixin(object):
             user = None
         self.log.user = user
 
-        # get data dict
-        try:
-            # Accessing request.data *for the first time* parses the request body, which may raise
-            # ParseError and UnsupportedMediaType exceptions. It's important not to swallow these,
-            # as (depending on implementation details) they may only get raised this once, and
-            # DRF logic needs them to be raised by the view for error handling to work correctly.
-            self.log.data = self._clean_data(request.data.dict())
-        except AttributeError:  # if already a dict, can't dictify
-            self.log.data = self._clean_data(request.data)
+        data_ = dict()
+
+        data_.update({
+            'POST': request.POST.dict(),
+            'files': request.FILES
+        })
+        self.log.data = self._clean_data(data_)
+
+        # try:
+        #     # Accessing request.data *for the first time* parses the request body, which may raise
+        #     # ParseError and UnsupportedMediaType exceptions. It's important not to swallow these,
+        #     # as (depending on implementation details) they may only get raised this once, and
+        #     # DRF logic needs them to be raised by the view for error handling to work correctly.
+        #     self.log.data = self._clean_data(data_.dict())
+        # except AttributeError:  # if already a dict, can't dictify
+        #     self.log.data = self._clean_data(data_)
+
 
     def handle_exception(self, exc, **kwargs):
         # log error
@@ -91,10 +101,11 @@ class BaseLoggingMixin(object):
         response_ms = int(response_timedelta.total_seconds() * 1000)
 
         # save to log
+        # import ipdb;ipdb.set_trace()
         if (self._should_log(request, response)):
-            self.log.response = response.get('rendered_content')
-            self.log.status_code = response.get('status_code')
-            self.log.response_ms = response_ms
+            # self.log.response = response.get('rendered_content')
+            # self.log.status_code = response.get('status_code')
+            # self.log.response_ms = response_ms
             try:
                 self.log.save()
             except Exception:
