@@ -2,17 +2,17 @@ from .models import APIRequestLog
 from django.utils.timezone import now
 import traceback
 
-from rest_framework.request import Request
-from rest_framework.settings import api_settings
-
 
 class BaseLoggingMixin(object):
     logging_methods = '__all__'
     sensitive_fields = {}
 
     """Mixin to log requests"""
-    def initial(self, request, *args, **kwargs):
+    def initial(self, request, drf_request, *args, **kwargs):
         # get IP
+        http_request_obj = request
+        request = drf_request
+
         ipaddr = request.META.get("HTTP_X_FORWARDED_FOR", None)
         if ipaddr:
             # X_FORWARDED_FOR returns client1, proxy1, proxy2,...
@@ -37,7 +37,7 @@ class BaseLoggingMixin(object):
             view_method = method.lower()
 
         # create log
-        qm = self._clean_data(request.GET.dict())
+        qm = self._clean_data(http_request_obj.GET.dict())
 
         self.log = APIRequestLog(
             requested_at=now(),
@@ -52,20 +52,21 @@ class BaseLoggingMixin(object):
 
         # regular initial, including auth check
         if kwargs.get('middleware') is not True:
-            super(BaseLoggingMixin, self).initial(request, *args, **kwargs)
+            super(BaseLoggingMixin, self).initial(http_request_obj, *args, **kwargs)
 
         # add user to log after auth
         user = request.user
+
         if user.is_anonymous():
             user = None
         self.log.user = user
 
-        data_ = dict()
+        data_ = http_request_obj.POST.dict()
 
-        data_.update({
-            'POST': request.POST.dict(),
-            'files': request.FILES
-        })
+        # data_.update({
+        #     'POST': http_request_obj.POST.dict(),
+        #     'files': http_request_obj.FILES
+        # })
         self.log.data = self._clean_data(data_)
 
         # try:
@@ -76,7 +77,6 @@ class BaseLoggingMixin(object):
         #     self.log.data = self._clean_data(data_.dict())
         # except AttributeError:  # if already a dict, can't dictify
         #     self.log.data = self._clean_data(data_)
-
 
     def handle_exception(self, exc, **kwargs):
         # log error
@@ -101,11 +101,14 @@ class BaseLoggingMixin(object):
         response_ms = int(response_timedelta.total_seconds() * 1000)
 
         # save to log
-        # import ipdb;ipdb.set_trace()
+
         if (self._should_log(request, response)):
-            # self.log.response = response.get('rendered_content')
-            # self.log.status_code = response.get('status_code')
-            # self.log.response_ms = response_ms
+            try:
+                self.log.response = response.rendered_content
+                self.log.status_code = response.status_code
+                self.log.response_ms = response_ms
+            except:
+                pass
             try:
                 self.log.save()
             except Exception:
@@ -136,7 +139,8 @@ class BaseLoggingMixin(object):
         """
         data = dict(data)
 
-        SENSITIVE_FIELDS = {'api', 'token', 'key', 'secret', 'password', 'signature'}
+        SENSITIVE_FIELDS = {'api', 'token', 'key', 'secret', 'password', 'signature',
+                            'old_password', 'csrfmiddlewaretoken', 'new_password'}
         CLEANED_SUBSTITUTE = '********************'
 
         if self.sensitive_fields:
